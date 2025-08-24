@@ -1,5 +1,8 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
-import { BookOpen, CheckCircle2, ListChecks, Search, Sparkles, ChevronRight, ChevronLeft, Languages, Library, Palette, Mic, FileText, Pencil, BrainCircuit, Heart, Film, Globe, Bot, Play } from "lucide-react";
+import { BookOpen, CheckCircle2, ListChecks, Search, Sparkles, ChevronRight, ChevronLeft,
+Languages, Library, Palette, Mic, FileText, Pencil, BrainCircuit, Heart, Film, Globe, Bot, Play
+} from "lucide-react";
+
 import { motion, AnimatePresence } from "framer-motion";
 
 // Helper functions for audio processing (PCM to WAV)
@@ -428,7 +431,7 @@ const courseDataGerman = [
     grammar: {
       topicEn: "Impersonal Expressions and Subjectless Sentences",
       topicDe: "Subjektlose Sätze und unpersönliche Ausdrücke",
-      explanationDe: "Im Deutschen gibt es viele unpersönliche Konstruktionen, die oft ohne ein echtes Subjekt auskommen oder das unpersönliche 'es' verwenden. Dazu gehören Ausdrücke wie 'Es regnet', 'Es ist kalt', 'Es geht um...', 'Es gibt...', oder Konstruktionen mit Passiv ohne Agens. Die genaue Bedeutung dieser Sätze erschließt sich aus dem Kontext.",
+      explanationDe: "Im Deutschen gibt es viele unpersönliche Konstruktionen, die oft ohne ein echtes Subjekt auskommen oder das unpersönliche 'es' verwenden. Dazu gehören Ausdrücke wie 'Es regnet', 'Es ist kalt', 'Es geht um...', 'Es gibt...', oder Konstruktionen mit Passiv ohne Agens.",
       examples: [
         { de: "Es regnet. (Es + Verb)" },
         { de: "Es wird gearbeitet. (unpersönliches Passiv)" },
@@ -1154,3 +1157,463 @@ const colorThemes = {
     gradient: 'from-pink-500 to-rose-500'
   },
 };
+
+
+const App = () => {
+    const [currentPage, setCurrentPage] = useState('home');
+    const [selectedUnit, setSelectedUnit] = useState(null);
+    const [currentQuestion, setCurrentQuestion] = useState(0);
+    const [showAnswer, setShowAnswer] = useState(false);
+    const [userAnswer, setUserAnswer] = useState(null);
+    const [isCorrect, setIsCorrect] = useState(null);
+    const [audioBlob, setAudioBlob] = useState(null);
+    const [isRecording, setIsRecording] = useState(false);
+    const [isVocabAudioLoading, setIsVocabAudioLoading] = useState(false);
+    const [vocabAudioUrl, setVocabAudioUrl] = useState(null);
+    const [isLoadingGrammarAI, setIsLoadingGrammarAI] = useState(false);
+    const [grammarAIResponse, setGrammarAIResponse] = useState(null);
+    const [isLoadingVocabAI, setIsLoadingVocabAI] = useState(false);
+    const [vocabAIResponse, setVocabAIResponse] = useState(null);
+    const [isLoadingSpeechAI, setIsLoadingSpeechAI] = useState(false);
+    const [speechAIResponse, setSpeechAIResponse] = useState(null);
+
+    const unitTheme = useMemo(() => {
+        if (selectedUnit) {
+            return colorThemes[selectedUnit.theme];
+        }
+        return null;
+    }, [selectedUnit]);
+
+    const handleStartQuiz = () => {
+        setCurrentQuestion(0);
+        setShowAnswer(false);
+        setUserAnswer(null);
+        setIsCorrect(null);
+        setCurrentPage('quiz');
+    };
+
+    const handleNextQuestion = () => {
+        if (currentQuestion < selectedUnit.quiz.length - 1) {
+            setCurrentQuestion(currentQuestion + 1);
+            setShowAnswer(false);
+            setUserAnswer(null);
+            setIsCorrect(null);
+        } else {
+            alert('Quiz finished!');
+            setCurrentPage('unit');
+        }
+    };
+
+    const handleAnswer = (index) => {
+        setUserAnswer(index);
+        setShowAnswer(true);
+        setIsCorrect(index === selectedUnit.quiz[currentQuestion].answer);
+    };
+
+    const handleBack = () => {
+        if (currentPage === 'unit') {
+            setSelectedUnit(null);
+            setCurrentPage('home');
+            setGrammarAIResponse(null);
+            setVocabAIResponse(null);
+            setSpeechAIResponse(null);
+        } else if (currentPage === 'quiz' || currentPage === 'ai-grammar' || currentPage === 'ai-vocab' || currentPage === 'ai-speech') {
+            setCurrentPage('unit');
+            setGrammarAIResponse(null);
+            setVocabAIResponse(null);
+            setSpeechAIResponse(null);
+        }
+    };
+
+    const getAiResponse = useCallback(async (model, prompt, unit) => {
+        // Placeholder for AI API call
+        console.log(`Calling AI model: ${model} with prompt: ${prompt}`);
+        // Simulate AI response for demonstration
+        if (model === 'grammar') {
+            setIsLoadingGrammarAI(true);
+            const relatedGrammar = grammarLibraryGerman.find(g => g.key === unit.grammar.topicEn.toLowerCase().replace(/ /g, '_').replace(/[\(\)]/g, ''));
+            setTimeout(() => {
+                setGrammarAIResponse({
+                    response: `Grammar explanation for "${unit.grammar.topicDe}":\n\n${unit.grammar.explanationDe}\n\nExamples:\n${unit.grammar.examples.map(ex => `- ${ex.de}`).join('\n')}`,
+                    relatedInfo: relatedGrammar
+                });
+                setIsLoadingGrammarAI(false);
+            }, 1500);
+        } else if (model === 'vocab') {
+            setIsLoadingVocabAI(true);
+            setTimeout(() => {
+                const selectedVocab = unit.vocabulary.slice(0, 5).join(', ');
+                setVocabAIResponse({
+                    response: `Here are some key vocabulary words from this unit: ${selectedVocab}. We can analyze their use in context.`,
+                });
+                setIsLoadingVocabAI(false);
+            }, 1500);
+        } else if (model === 'speech') {
+            setIsLoadingSpeechAI(true);
+            setTimeout(() => {
+                setSpeechAIResponse({
+                    response: "Your pronunciation is very clear! Try to focus on the 'ch' sound in 'Ich'."
+                });
+                setIsLoadingSpeechAI(false);
+            }, 1500);
+        }
+    }, [grammarLibraryGerman]);
+
+    const startRecording = () => {
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    const mediaRecorder = new MediaRecorder(stream);
+                    mediaRecorder.start();
+                    setIsRecording(true);
+                    const audioChunks = [];
+                    mediaRecorder.addEventListener("dataavailable", event => {
+                        audioChunks.push(event.data);
+                    });
+                    mediaRecorder.addEventListener("stop", () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                        setAudioBlob(audioBlob);
+                        setIsRecording(false);
+                    });
+                    setTimeout(() => {
+                        mediaRecorder.stop();
+                    }, 5000); // Record for 5 seconds
+                });
+        } else {
+            alert("Audio recording is not supported in this browser.");
+        }
+    };
+
+    const getVocabAudio = async () => {
+        setIsVocabAudioLoading(true);
+        setVocabAudioUrl(null);
+        const text = selectedUnit.vocabulary[Math.floor(Math.random() * selectedUnit.vocabulary.length)];
+        const response = {
+            audioContent: "UklGRoAAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YRIAAAD//wABAAAAAQAAAABAAAAAAAAAAEAAQAA"
+        };
+        const arrayBuffer = base64ToArrayBuffer(response.audioContent);
+        const blob = pcmToWav(new Int16Array(arrayBuffer), 16000);
+        const audioUrl = URL.createObjectURL(blob);
+        setVocabAudioUrl(audioUrl);
+        setIsVocabAudioLoading(false);
+    };
+
+    const renderHeader = () => (
+        <div className="flex justify-between items-center py-4 px-6 bg-gray-100 border-b border-gray-200">
+            {currentPage !== 'home' && (
+                <button onClick={handleBack} className="p-2 rounded-full hover:bg-gray-200">
+                    <ChevronLeft />
+                </button>
+            )}
+            <h1 className="text-2xl font-bold text-gray-800 flex-1 text-center">
+                C1 Deutschkurs
+            </h1>
+            {currentPage === 'home' && (
+                <button className="p-2 rounded-full opacity-0 cursor-default">
+                    <ChevronLeft />
+                </button>
+            )}
+        </div>
+    );
+
+    const renderUnitCard = (unit) => (
+        <motion.div
+            key={unit.id}
+            className={`p-6 rounded-xl shadow-lg transition-all transform hover:scale-105 cursor-pointer border-l-4 ${colorThemes[unit.theme].bg} ${colorThemes[unit.theme].border} group`}
+            onClick={() => { setSelectedUnit(unit); setCurrentPage('unit'); }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+        >
+            <div className="flex items-center space-x-4 mb-2">
+                <div className={`p-3 rounded-full bg-white/50`}>
+                    <BookOpen className={colorThemes[unit.theme].text} />
+                </div>
+                <h2 className={`text-xl font-bold ${colorThemes[unit.theme].text}`}>{unit.title}</h2>
+            </div>
+            <p className={`text-gray-600 group-hover:text-gray-800`}>{unit.overview.split('. ')[0]}.</p>
+        </motion.div>
+    );
+
+    const renderLessonSection = (title, icon, content, action, isLoading) => (
+        <motion.div
+            key={title}
+            className={`flex items-center justify-between p-4 rounded-lg border border-gray-200 shadow-sm transition-all duration-200 cursor-pointer hover:bg-gray-50 mb-3`}
+            onClick={action && !isLoading ? action : null}
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            transition={{ duration: 0.3 }}
+        >
+            <div className="flex items-center space-x-4">
+                <div className={`p-2 rounded-full ${unitTheme.bg} text-white`}>
+                    {icon}
+                </div>
+                <div>
+                    <h3 className={`text-lg font-semibold ${unitTheme.text}`}>{title}</h3>
+                    <p className="text-gray-500 text-sm">{content}</p>
+                </div>
+            </div>
+            {isLoading ? (
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-900"></div>
+            ) : (
+                <ChevronRight className="text-gray-400 group-hover:text-gray-600" />
+            )}
+        </motion.div>
+    );
+
+    const renderQuiz = () => {
+        const currentQuiz = selectedUnit.quiz[currentQuestion];
+        return (
+            <div className="p-6 bg-white min-h-screen">
+                <h2 className={`text-3xl font-bold mb-4 ${unitTheme.text}`}>{selectedUnit.title} Quiz</h2>
+                <div className="bg-gray-50 p-6 rounded-lg shadow-md mb-6">
+                    <p className="text-xl text-gray-800 font-medium mb-4">
+                        Question {currentQuestion + 1} of {selectedUnit.quiz.length}
+                    </p>
+                    <p className="text-2xl font-bold text-gray-900 mb-6">{currentQuiz.q}</p>
+                    <div className="space-y-4">
+                        {currentQuiz.choices.map((choice, index) => (
+                            <button
+                                key={index}
+                                onClick={() => !showAnswer && handleAnswer(index)}
+                                className={`w-full text-left p-4 rounded-md border-2 transition-all duration-300
+                                    ${showAnswer ? (index === currentQuiz.answer ? 'bg-green-100 border-green-600 text-green-800' : (userAnswer === index ? 'bg-red-100 border-red-600 text-red-800' : 'bg-white border-gray-300')) : 'bg-white border-gray-300 hover:bg-gray-100'}
+                                `}
+                                disabled={showAnswer}
+                            >
+                                {choice}
+                                {showAnswer && (
+                                    <span className="ml-2">
+                                        {index === currentQuiz.answer ? '✅' : (userAnswer === index ? '❌' : '')}
+                                    </span>
+                                )}
+                            </button>
+                        ))}
+                    </div>
+                    {showAnswer && (
+                        <div className="mt-6 p-4 rounded-md bg-gray-100 border border-gray-300">
+                            <h4 className="font-bold text-gray-800">Explanation:</h4>
+                            <p className="text-gray-600">{currentQuiz.explanation}</p>
+                        </div>
+                    )}
+                    <div className="mt-6 flex justify-end">
+                        {showAnswer && (
+                            <button
+                                onClick={handleNextQuestion}
+                                className={`bg-gray-800 text-white py-2 px-6 rounded-md shadow-lg hover:bg-gray-700 transition-all duration-200`}
+                            >
+                                {currentQuestion === selectedUnit.quiz.length - 1 ? 'Finish' : 'Next Question'}
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const renderAiResponse = (response, isLoading, type) => (
+        <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            {isLoading ? (
+                <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                </div>
+            ) : response ? (
+                <div>
+                    <div className="flex items-center space-x-2 mb-3">
+                        <Bot className={unitTheme.text} />
+                        <h3 className={`font-semibold text-lg ${unitTheme.text}`}>AI Assistant</h3>
+                    </div>
+                    <p className="text-gray-700 whitespace-pre-wrap">{response.response}</p>
+                </div>
+            ) : (
+                <div className="text-gray-500 text-center py-8">
+                    Your AI response will appear here.
+                </div>
+            )}
+        </div>
+    );
+
+    const renderPage = () => {
+        switch (currentPage) {
+            case 'home':
+                return (
+                    <div className="p-6 bg-white min-h-screen">
+                        <h2 className="text-3xl font-bold text-gray-800 mb-6">Units</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {courseDataGerman.map(renderUnitCard)}
+                        </div>
+                    </div>
+                );
+            case 'unit':
+                const unit = selectedUnit;
+                return (
+                    <div className="p-6 bg-white min-h-screen">
+                        <h2 className={`text-3xl font-bold mb-2 ${unitTheme.text}`}>{unit.title}</h2>
+                        <p className="text-gray-600 mb-6">{unit.overview}</p>
+
+                        <div className="space-y-4 mb-6">
+                            {renderLessonSection(
+                                'Vocabulary',
+                                <Languages />,
+                                'Practice key words and phrases.',
+                                () => {
+                                    setVocabAIResponse(null);
+                                    setCurrentPage('ai-vocab');
+                                    getAiResponse('vocab', `Explain key vocabulary for unit ${unit.title} at C1 German level.`, unit);
+                                },
+                                isLoadingVocabAI
+                            )}
+                            {renderLessonSection(
+                                'Grammar',
+                                <Library />,
+                                'Review advanced grammatical concepts.',
+                                () => {
+                                    setGrammarAIResponse(null);
+                                    setCurrentPage('ai-grammar');
+                                    getAiResponse('grammar', `Explain the C1 German grammar topic: "${unit.grammar.topicEn}".`, unit);
+                                },
+                                isLoadingGrammarAI
+                            )}
+                            {renderLessonSection(
+                                'Reading',
+                                <FileText />,
+                                'Analyze a C1-level text.',
+                                () => setCurrentPage('reading')
+                            )}
+                            {renderLessonSection(
+                                'Speaking',
+                                <Mic />,
+                                'Practice pronunciation with AI feedback.',
+                                () => setCurrentPage('ai-speech')
+                            )}
+                            {renderLessonSection(
+                                'Writing',
+                                <Pencil />,
+                                'Write an essay and get feedback.',
+                                () => setCurrentPage('writing')
+                            )}
+                            {renderLessonSection(
+                                'Quiz',
+                                <ListChecks />,
+                                'Test your knowledge with a quiz.',
+                                handleStartQuiz
+                            )}
+                        </div>
+                    </div>
+                );
+            case 'ai-grammar':
+                return (
+                    <div className="p-6 bg-white min-h-screen">
+                        <h2 className={`text-3xl font-bold mb-4 ${unitTheme.text}`}>{selectedUnit.grammar.topicDe}</h2>
+                        <p className="text-gray-600 mb-6">{selectedUnit.grammar.explanationDe}</p>
+                        {renderAiResponse(grammarAIResponse, isLoadingGrammarAI, 'grammar')}
+                    </div>
+                );
+            case 'ai-vocab':
+                return (
+                    <div className="p-6 bg-white min-h-screen">
+                        <h2 className={`text-3xl font-bold mb-4 ${unitTheme.text}`}>Vocabulary Assistant</h2>
+                        <p className="text-gray-600 mb-6">
+                            Here are the key vocabulary words from this unit:
+                            <ul className="list-disc list-inside mt-2">
+                                {selectedUnit.vocabulary.map((word, index) => (
+                                    <li key={index}>{word}</li>
+                                ))}
+                            </ul>
+                        </p>
+                        <button
+                            className={`mt-4 w-full py-2 px-4 rounded-md flex items-center justify-center transition-all duration-300 ${!vocabAudioUrl || isVocabAudioLoading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-200'}`}
+                            onClick={getVocabAudio}
+                        >
+                            <Play className="mr-2" />
+                            {isVocabAudioLoading ? 'Loading Audio...' : 'Play Random Word Audio'}
+                        </button>
+                        {vocabAudioUrl && (
+                            <audio controls src={vocabAudioUrl} className="mt-4 w-full"></audio>
+                        )}
+                        {renderAiResponse(vocabAIResponse, isLoadingVocabAI, 'vocab')}
+                    </div>
+                );
+            case 'ai-speech':
+                return (
+                    <div className="p-6 bg-white min-h-screen">
+                        <h2 className={`text-3xl font-bold mb-4 ${unitTheme.text}`}>Speech Practice</h2>
+                        <div className="bg-gray-50 p-6 rounded-lg shadow-md mb-6">
+                            <p className="text-xl text-gray-800 font-medium mb-4">
+                                Read the following sentence:
+                            </p>
+                            <p className="text-2xl font-bold text-gray-900 mb-6">
+                                {selectedUnit.speaking[0]}
+                            </p>
+                            <button
+                                onClick={startRecording}
+                                className={`mt-4 w-full py-2 px-4 rounded-md flex items-center justify-center transition-all duration-300 ${isRecording ? 'bg-red-500 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'}`}
+                            >
+                                <Mic className="mr-2" />
+                                {isRecording ? 'Recording...' : 'Start Recording (5s)'}
+                            </button>
+                            {audioBlob && (
+                                <audio controls src={URL.createObjectURL(audioBlob)} className="mt-4 w-full"></audio>
+                            )}
+                            {renderAiResponse(speechAIResponse, isLoadingSpeechAI, 'speech')}
+                        </div>
+                    </div>
+                );
+            case 'reading':
+                return (
+                    <div className="p-6 bg-white min-h-screen">
+                        <h2 className={`text-3xl font-bold mb-4 ${unitTheme.text}`}>{selectedUnit.reading.title}</h2>
+                        <div className="bg-gray-50 p-6 rounded-lg shadow-md mb-6">
+                            <p className="text-gray-800 text-lg whitespace-pre-wrap">{selectedUnit.reading.text}</p>
+                        </div>
+                        <div className="p-4 rounded-lg border-2 border-dashed border-gray-300 bg-gray-100">
+                            <h3 className={`text-lg font-semibold ${unitTheme.text} mb-2`}>Reading Task:</h3>
+                            <p className="text-gray-700">{selectedUnit.reading.task}</p>
+                        </div>
+                    </div>
+                );
+            case 'writing':
+                return (
+                    <div className="p-6 bg-white min-h-screen">
+                        <h2 className={`text-3xl font-bold mb-4 ${unitTheme.text}`}>Writing Task</h2>
+                        <div className="bg-gray-50 p-6 rounded-lg shadow-md mb-6">
+                            <p className="text-gray-800 text-lg whitespace-pre-wrap">{selectedUnit.writing}</p>
+                            <textarea
+                                className="mt-4 w-full p-4 rounded-md border-2 border-gray-300 focus:outline-none focus:border-gray-500"
+                                rows="10"
+                                placeholder="Write your response here..."
+                            ></textarea>
+                        </div>
+                    </div>
+                );
+            case 'quiz':
+                return renderQuiz();
+            default:
+                return <div>Page not found</div>;
+        }
+    };
+
+    return (
+        <div className="font-sans antialiased text-gray-900 bg-gray-100">
+            {renderHeader()}
+            <main className="container mx-auto">
+                <AnimatePresence mode="wait">
+                    <motion.div
+                        key={currentPage}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={{ duration: 0.2 }}
+                    >
+                        <div className="p-4">
+                            {renderPage()}
+                        </div>
+                    </motion.div>
+                </AnimatePresence>
+            </main>
+        </div>
+    );
+};
+export default App;
